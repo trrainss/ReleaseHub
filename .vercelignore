@@ -1,0 +1,10 @@
+# Ignore unnecessary files
+.env
+.env.local
+.env.*.local
+node_modules
+.git
+.github
+docs
+e2e
+*.log
