@@ -17,11 +17,19 @@ export const router = createBrowserRouter([
     element: <SignInPage />,
   },
   {
+    path: '/login',
+    element: <SignInPage />,
+  },
+  {
       path: '/accept-invite',
       element: <AcceptInvitePage />,
   },
   {
     path: '/auth/signup',
+    element: <SignUpPage />,
+  },
+  {
+    path: '/register',
     element: <SignUpPage />,
   },
   {

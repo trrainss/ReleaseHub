@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { getWorkspaceMembers } from '@/shared/api/workspaces';
-import { removeMember, updateMemberRole } from '@/shared/api/releases';
+import { removeMember, updateMemberRole } from '@/shared/api/workspaces';
 import { Button } from '@/shared/ui/Button';
 import { Select } from '@/shared/ui/Select';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';

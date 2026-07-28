@@ -7,6 +7,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner size="lg" />;
+  
+
   if (!user) return <Navigate to="/auth/signin" replace />;
 
   return <>{children}</>;
