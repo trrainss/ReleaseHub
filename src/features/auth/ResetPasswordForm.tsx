@@ -39,16 +39,21 @@ export function ResetPasswordForm() {
   if (sent) {
     return (
       <div className="auth-form">
-        <h1 className="auth-form__title">Check your email</h1>
-        <p>Password reset link has been sent.</p>
-        <Link to="/auth/signin" className="btn btn--primary">Back to Sign In</Link>
+        <h1 className="auth-form__title">Проверьте почту</h1>
+        <p className="auth-form__subtitle">
+          Ссылка для сброса пароля отправлена на ваш email.
+        </p>
+        <Link to="/auth/signin" className="btn btn--primary auth-form__submit">Вернуться ко входу</Link>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
-      <h1 className="auth-form__title">Reset Password</h1>
+      <h1 className="auth-form__title">Сброс пароля</h1>
+      <p className="auth-form__subtitle">
+        Введите email — мы отправим ссылку для восстановления
+      </p>
       <Input
         label="Email"
         type="email"
@@ -56,11 +61,11 @@ export function ResetPasswordForm() {
         error={errors.email?.message}
       />
       <Button type="submit" loading={loading} className="auth-form__submit">
-        Send Reset Link
+        Отправить ссылку
       </Button>
-      <p className="auth-form__links">
-        <Link to="/auth/signin">Back to Sign In</Link>
-      </p>
+      <div className="auth-form__links">
+        <Link to="/auth/signin" className="auth-form__link">Вернуться ко входу</Link>
+      </div>
     </form>
   );
 }

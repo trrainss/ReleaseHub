@@ -102,7 +102,7 @@ export function ReleaseList({ productId }: ReleaseListProps) {
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
-            <Button size="sm" onClick={handleSearch}>Search</Button>
+            <Button onClick={handleSearch}>Search</Button>
           </div>
           <Select
             value={status}

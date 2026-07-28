@@ -19,12 +19,9 @@ export function InviteForm({ workspaceId, onSuccess }: InviteFormProps) {
 
     const mutation = useMutation({
         mutationFn: async () => {
-            console.log('🔵 Sending invite:', { workspaceId, email, role });
-            
             if (!email.trim()) {
                 throw new Error('Email is required');
             }
-            
             return await inviteMember(workspaceId, email.trim(), role);
         },
         onSuccess: () => {
@@ -34,7 +31,6 @@ export function InviteForm({ workspaceId, onSuccess }: InviteFormProps) {
             onSuccess?.();
         },
         onError: (err: any) => {
-            console.error('🔴 Invite error:', err);
             setError(err.message || 'Failed to send invite');
             addToast(err.message || 'Failed to send invite', 'error');
         },
@@ -47,23 +43,21 @@ export function InviteForm({ workspaceId, onSuccess }: InviteFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email address"
-                    disabled={mutation.isPending}
-                    className="w-full"
-                />
-            </div>
-            <div>
+        <form onSubmit={handleSubmit} className="invite-form">
+            <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email address"
+                disabled={mutation.isPending}
+            />
+            <div className="input-group">
+                <label className="input-group__label">Role</label>
                 <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     disabled={mutation.isPending}
-                    className="w-full border rounded px-3 py-2"
+                    className="input"
                 >
                     <option value="contributor">Contributor</option>
                     <option value="maintainer">Maintainer</option>
@@ -71,9 +65,9 @@ export function InviteForm({ workspaceId, onSuccess }: InviteFormProps) {
                 </select>
             </div>
             {error && (
-                <p className="text-red-500 text-sm">{error}</p>
+                <p className="input-group__error">{error}</p>
             )}
-            <div className="flex gap-2">
+            <div className="modal__actions">
                 <Button
                     type="submit"
                     disabled={mutation.isPending}

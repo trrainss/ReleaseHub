@@ -150,7 +150,7 @@ export function ReleaseDetail() {
         </section>
 
         <section>
-          <div className="flex justify-between items-center mb-4">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-base)' }}>
             <h2>Reviewers & Approval</h2>
             {release.status === 'draft' && (
               <AssignReviewers

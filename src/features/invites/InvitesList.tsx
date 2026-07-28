@@ -3,6 +3,9 @@ import { supabase } from '@/shared/lib/supabase';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
+import { LoadingSpinner } from '@/shared/ui/LoadingSpinner';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorMessage } from '@/shared/ui/ErrorMessage';
 
 export function InvitesList() {
     const { user } = useAuth();
@@ -14,7 +17,6 @@ export function InvitesList() {
         queryFn: async () => {
             if (!user) return [];
             
-            // Пробуем найти по email напрямую
             const { data, error } = await supabase
                 .from('workspace_invites')
                 .select('*')
@@ -26,7 +28,6 @@ export function InvitesList() {
                 throw error;
             }
             
-            console.log('Invites for email:', data);
             return data || [];
         },
         enabled: !!user,
@@ -34,18 +35,20 @@ export function InvitesList() {
 
     const acceptMutation = useMutation({
         mutationFn: async (tokenHash: string) => {
-            console.log('Calling accept_invite with token:', tokenHash);
             const { data, error } = await supabase.rpc('accept_invite', {
                 p_token_hash: tokenHash,
             });
-            if (error) {
-                console.error('RPC error:', error);
-                throw error;
-            }
-            console.log('Success:', data);
+            if (error) throw error;
             return data;
         },
-    
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['my-invites', user?.id] });
+            addToast('Invitation accepted!', 'success');
+            refetch();
+        },
+        onError: (err: any) => {
+            addToast(err.message || 'Failed to accept invite', 'error');
+        },
     });
 
     const declineMutation = useMutation({
@@ -66,57 +69,50 @@ export function InvitesList() {
         },
     });
 
-    if (isLoading) return <div>Loading invites...</div>;
+    if (isLoading) return <LoadingSpinner size="lg" />;
 
     if (error) {
-        console.error('Query error:', error);
-        return <div className="text-red-500">Error loading invites</div>;
+        return <ErrorMessage message={error instanceof Error ? error.message : 'Failed to load invites'} onRetry={refetch} />;
     }
 
     if (!invites || invites.length === 0) {
         return (
-            <div className="text-center py-8 text-gray-500">
-                <p className="text-lg">No pending invitations</p>
-                <p className="text-sm">You haven't been invited to any workspaces yet.</p>
-            </div>
+            <EmptyState
+                title="No pending invitations"
+                description="You haven't been invited to any workspaces yet."
+            />
         );
     }
 
     return (
-        <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Pending Invitations</h2>
+        <div className="invites-list">
             {invites.map((invite: any) => (
-                <div key={invite.id} className="bg-white p-4 rounded-lg shadow border">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h3 className="font-semibold text-lg">
-                                Workspace
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                                Role: <span className="font-medium">{invite.role}</span>
-                            </p>
-                            <p className="text-sm text-gray-500">
-                                Expires: {new Date(invite.expires_at).toLocaleDateString()}
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                size="sm"
-                                onClick={() => acceptMutation.mutate(invite.token_hash)}
-                                loading={acceptMutation.isPending}
-                            >
-                                Accept
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => declineMutation.mutate(invite.id)}
-                                loading={declineMutation.isPending}
-                                className="text-red-600 hover:bg-red-50"
-                            >
-                                Decline
-                            </Button>
-                        </div>
+                <div key={invite.id} className="invite-card">
+                    <div className="invite-card__info">
+                        <h3 className="invite-card__title">Workspace Invitation</h3>
+                        <p className="invite-card__meta">
+                            Role: <span className="invite-card__role">{invite.role}</span>
+                        </p>
+                        <p className="invite-card__meta">
+                            Expires: {new Date(invite.expires_at).toLocaleDateString()}
+                        </p>
+                    </div>
+                    <div className="invite-card__actions">
+                        <Button
+                            size="sm"
+                            onClick={() => acceptMutation.mutate(invite.token_hash)}
+                            loading={acceptMutation.isPending}
+                        >
+                            Accept
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => declineMutation.mutate(invite.id)}
+                            loading={declineMutation.isPending}
+                        >
+                            Decline
+                        </Button>
                     </div>
                 </div>
             ))}

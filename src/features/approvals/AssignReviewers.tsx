@@ -19,7 +19,6 @@ export function AssignReviewers({ releaseId, workspaceId, currentReviewers, onAs
     const { addToast } = useToast();
     const queryClient = useQueryClient();
 
-    // Получаем участников пространства
     const { data: members, isLoading } = useQuery({
         queryKey: ['workspace-members', workspaceId],
         queryFn: async () => {
@@ -40,16 +39,13 @@ export function AssignReviewers({ releaseId, workspaceId, currentReviewers, onAs
         enabled: !!workspaceId,
     });
 
-    // Мутация для сохранения согласующих
     const assignMutation = useMutation({
         mutationFn: async (reviewerIds: string[]) => {
-            // Удаляем старых согласующих
             await supabase
                 .from('release_reviewers')
                 .delete()
                 .eq('release_id', releaseId);
 
-            // Добавляем новых
             if (reviewerIds.length === 0) return;
 
             const { error } = await supabase
@@ -94,41 +90,54 @@ export function AssignReviewers({ releaseId, workspaceId, currentReviewers, onAs
                 }}
             >
                 {currentReviewers.length > 0 ? 'Edit Reviewers' : 'Add Reviewers'}
-                <span className="ml-1 text-xs">({currentReviewers.length})</span>
+                <span style={{ marginLeft: '0.25rem', fontSize: '0.75rem', opacity: 0.7 }}>({currentReviewers.length})</span>
             </Button>
 
             <Modal open={isOpen} onClose={() => setIsOpen(false)} title="Assign Reviewers">
-                <div className="space-y-4">
-                    <p className="text-sm text-gray-500">
+                <div className="modal-form">
+                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-lg)' }}>
                         Select users who can approve or reject this release.
                     </p>
 
                     {isLoading ? (
-                        <div className="text-center py-4">Loading members...</div>
+                        <div style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--color-text-tertiary)' }}>
+                            Loading members...
+                        </div>
                     ) : (
-                        <div className="max-h-60 overflow-y-auto space-y-1">
+                        <div style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: 'var(--space-lg)' }}>
                             {members?.map((member: any) => (
                                 <label
                                     key={member.user_id}
-                                    className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 'var(--space-md)',
+                                        padding: 'var(--space-sm) var(--space-md)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        cursor: 'pointer',
+                                        transition: 'background var(--transition-fast)',
+                                    }}
+                                    className="reviewer-option"
                                 >
                                     <input
                                         type="checkbox"
                                         checked={selected.includes(member.user_id)}
                                         onChange={() => toggleUser(member.user_id)}
-                                        className="w-4 h-4"
+                                        style={{ width: '1rem', height: '1rem', accentColor: 'var(--color-primary)' }}
                                     />
                                     <span>{member.profiles?.display_name || 'Unknown'}</span>
-                                    <span className="text-xs text-gray-400">({member.role})</span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)', marginLeft: 'auto' }}>({member.role})</span>
                                 </label>
                             ))}
                             {members?.length === 0 && (
-                                <p className="text-gray-500 text-sm">No members found in this workspace.</p>
+                                <p style={{ color: 'var(--color-text-tertiary)', fontSize: '0.875rem', textAlign: 'center', padding: 'var(--space-lg)' }}>
+                                    No members found in this workspace.
+                                </p>
                             )}
                         </div>
                     )}
 
-                    <div className="flex gap-2 pt-4 border-t">
+                    <div className="modal__actions">
                         <Button
                             onClick={handleSave}
                             loading={assignMutation.isPending}
@@ -142,6 +151,12 @@ export function AssignReviewers({ releaseId, workspaceId, currentReviewers, onAs
                     </div>
                 </div>
             </Modal>
+
+            <style>{`
+                .reviewer-option:hover {
+                    background: var(--color-surface-hover);
+                }
+            `}</style>
         </>
     );
 }

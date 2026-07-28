@@ -27,13 +27,10 @@ export function InvitesPage() {
     return (
         <div className="page">
             <header className="page__header">
-                <div className="flex items-center gap-4">
-                    <button 
-                        onClick={() => navigate('/workspaces')}
-                        className="text-blue-600 hover:underline"
-                    >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-lg)' }}>
+                    <Button variant="ghost" onClick={() => navigate('/workspaces')}>
                         ← Back
-                    </button>
+                    </Button>
                     <h1>My Invitations</h1>
                 </div>
                 <div className="page__header-actions">
@@ -41,7 +38,7 @@ export function InvitesPage() {
                     <Button variant="ghost" onClick={handleSignOut}>Sign Out</Button>
                 </div>
             </header>
-            <div className="max-w-3xl mx-auto mt-8">
+            <div className="invites-page__content">
                 <InvitesList />
             </div>
         </div>

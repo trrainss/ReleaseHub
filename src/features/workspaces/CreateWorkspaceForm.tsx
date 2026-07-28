@@ -63,7 +63,7 @@ export function CreateWorkspaceForm({ onSuccess }: CreateWorkspaceFormProps) {
         error={errors.name?.message}
       />
       {!user && (
-        <p className="text-yellow-500 text-sm mt-1">
+        <p className="input-group__error">
            Please login to create a workspace
         </p>
       )}

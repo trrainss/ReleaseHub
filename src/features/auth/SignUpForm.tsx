@@ -42,15 +42,14 @@ export function SignUpForm() {
   if (sent) {
     return (
       <div className="auth-form">
-        <h1 className="auth-form__title">📧 Проверьте почту</h1>
-        <p style={{ color: 'var(--color-text-secondary)' }}>
+        <h1 className="auth-form__title">Проверьте почту</h1>
+        <p className="auth-form__subtitle">
           Мы отправили ссылку для подтверждения. После подтверждения вы сможете войти.
         </p>
         <button
           type="button"
-          className="btn btn--primary"
+          className="btn btn--primary auth-form__submit"
           onClick={() => navigate('/auth/signin')}
-          style={{ marginTop: '1rem' }}
         >
           Перейти ко входу
         </button>
@@ -60,13 +59,8 @@ export function SignUpForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
-      <h1 className="auth-form__title">🚀 Создать аккаунт</h1>
-      <p style={{ 
-        textAlign: 'center', 
-        color: 'var(--color-text-secondary)', 
-        marginBottom: '1.5rem',
-        fontSize: '0.875rem'
-      }}>
+      <h1 className="auth-form__title">Создать аккаунт</h1>
+      <p className="auth-form__subtitle">
         Начните управлять релизами
       </p>
 
@@ -101,15 +95,11 @@ export function SignUpForm() {
         Зарегистрироваться
       </Button>
 
-      <div className="auth-form__links" style={{ 
-        marginTop: '1rem',
-        textAlign: 'center'
-      }}>
+      <div className="auth-form__links">
         <button
           type="button"
-          className="btn btn--ghost btn--sm"
+          className="auth-form__link"
           onClick={() => navigate('/auth/signin')}
-          style={{ color: 'var(--color-primary)' }}
         >
           Уже есть аккаунт? Войти
         </button>

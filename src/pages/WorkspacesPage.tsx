@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { WorkspaceList } from '@/features/workspaces/WorkspaceList';
 import { CreateWorkspaceForm } from '@/features/workspaces/CreateWorkspaceForm';
 import { Modal } from '@/shared/ui/Modal';
 import { Button } from '@/shared/ui/Button';
 import { signOut } from '@/shared/api/auth';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/shared/hooks/useAuth';
 
 export function WorkspacesPage() {
@@ -23,10 +22,10 @@ export function WorkspacesPage() {
       <header className="page__header">
         <h1>Workspaces</h1>
         <div className="page__header-actions">
-          <Link to="/invites" className="back-link" style={{ marginRight: 0 }}>
-             Invitations
-          </Link>
           <span>{profile?.display_name}</span>
+          <Button variant="ghost" onClick={() => navigate('/invites')}>
+            Invitations
+          </Button>
           <Button onClick={() => setShowCreate(true)}>New Workspace</Button>
           <Button variant="ghost" onClick={handleSignOut}>Sign Out</Button>
         </div>

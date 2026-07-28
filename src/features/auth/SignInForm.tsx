@@ -39,13 +39,8 @@ export function SignInForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="auth-form">
-      <h1 className="auth-form__title">🚀 ReleaseHub</h1>
-      <p style={{ 
-        textAlign: 'center', 
-        color: 'var(--color-text-secondary)', 
-        marginBottom: '1.5rem',
-        fontSize: '0.875rem'
-      }}>
+      <h1 className="auth-form__title">ReleaseHub</h1>
+      <p className="auth-form__subtitle">
         Управление релизами
       </p>
 
@@ -71,24 +66,17 @@ export function SignInForm() {
         Войти
       </Button>
 
-      <div className="auth-form__links" style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '0.5rem',
-        marginTop: '1rem',
-        alignItems: 'center'
-      }}>
+      <div className="auth-form__links">
         <button
           type="button"
-          className="btn btn--ghost btn--sm"
+          className="auth-form__link"
           onClick={() => navigate('/auth/signup')}
-          style={{ color: 'var(--color-primary)' }}
         >
           Нет аккаунта? Зарегистрироваться
         </button>
         <button
           type="button"
-          className="btn btn--ghost btn--sm"
+          className="auth-form__link"
           onClick={() => navigate('/auth/reset-password')}
         >
           Забыли пароль?
