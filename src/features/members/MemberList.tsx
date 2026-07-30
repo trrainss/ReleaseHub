@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { getWorkspaceMembers } from '@/shared/api/workspaces';
-import { removeMember, updateMemberRole } from '@/shared/api/workspaces';
+import { getWorkspaceMembers, removeMember, updateMemberRole } from '@/shared/api/workspaces';
 import { Button } from '@/shared/ui/Button';
 import { Select } from '@/shared/ui/Select';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
@@ -42,8 +41,7 @@ export function MemberList({ workspaceId, userRole }: MemberListProps) {
   });
 
   const roleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) =>
-      updateMemberRole(workspaceId, userId, role),
+    mutationFn: ({ userId, role }: { userId: string; role: string }) => updateMemberRole(workspaceId, userId, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
       addToast('Role updated', 'success');

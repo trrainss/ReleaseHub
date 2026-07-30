@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/shared/lib/supabase';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
 import { LoadingSpinner } from '@/shared/ui/LoadingSpinner';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorMessage } from '@/shared/ui/ErrorMessage';
+import { getMyInvites, acceptInvite, declineInvite } from '@/shared/api/workspaces';
+import type { WorkspaceInvite } from '@/shared/types';
 
 export function InvitesList() {
     const { user } = useAuth();
@@ -14,57 +15,30 @@ export function InvitesList() {
 
     const { data: invites, isLoading, error, refetch } = useQuery({
         queryKey: ['my-invites', user?.id],
-        queryFn: async () => {
-            if (!user) return [];
-            
-            const { data, error } = await supabase
-                .from('workspace_invites')
-                .select('*')
-                .eq('email', user.email)
-                .eq('status', 'pending');
-
-            if (error) {
-                console.error('Error:', error);
-                throw error;
-            }
-            
-            return data || [];
-        },
+        queryFn: () => getMyInvites(user!.email ?? ''),
         enabled: !!user,
     });
 
     const acceptMutation = useMutation({
-        mutationFn: async (tokenHash: string) => {
-            const { data, error } = await supabase.rpc('accept_invite', {
-                p_token_hash: tokenHash,
-            });
-            if (error) throw error;
-            return data;
-        },
+        mutationFn: (tokenHash: string) => acceptInvite(tokenHash),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['my-invites', user?.id] });
             addToast('Invitation accepted!', 'success');
             refetch();
         },
-        onError: (err: any) => {
+        onError: (err: Error) => {
             addToast(err.message || 'Failed to accept invite', 'error');
         },
     });
 
     const declineMutation = useMutation({
-        mutationFn: async (inviteId: string) => {
-            const { error } = await supabase
-                .from('workspace_invites')
-                .update({ status: 'expired' })
-                .eq('id', inviteId);
-            if (error) throw error;
-        },
+        mutationFn: (inviteId: string) => declineInvite(inviteId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['my-invites', user?.id] });
             addToast('Invite declined', 'info');
             refetch();
         },
-        onError: (err: any) => {
+        onError: (err: Error) => {
             addToast(err.message || 'Failed to decline invite', 'error');
         },
     });
@@ -86,7 +60,7 @@ export function InvitesList() {
 
     return (
         <div className="invites-list">
-            {invites.map((invite: any) => (
+            {invites.map((invite: WorkspaceInvite) => (
                 <div key={invite.id} className="invite-card">
                     <div className="invite-card__info">
                         <h3 className="invite-card__title">Workspace Invitation</h3>

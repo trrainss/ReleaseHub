@@ -30,17 +30,9 @@ export function CreateWorkspaceForm({ onSuccess }: CreateWorkspaceFormProps) {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      // Проверяем, что пользователь авторизован
       if (!user) {
         throw new Error('You must be logged in to create a workspace');
       }
-      
-      console.log(' Creating workspace:', { 
-        name: data.name, 
-        userId: user.id 
-      });
-      
-      // Передаем name и userId
       return createWorkspace(data.name, user.id);
     },
     onSuccess: () => {
@@ -50,7 +42,6 @@ export function CreateWorkspaceForm({ onSuccess }: CreateWorkspaceFormProps) {
       onSuccess?.();
     },
     onError: (err) => {
-      console.error(' Create error:', err);
       addToast(err instanceof Error ? err.message : 'Failed to create workspace', 'error');
     },
   });

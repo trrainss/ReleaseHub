@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "audit": "npm audit --audit-level=high",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
@@ -37,6 +38,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
@@ -50,6 +52,7 @@
     "oxlint": "^1.71.0",
     "prettier": "^3.9.5",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.65.0",
     "vite": "^8.1.1"
   }
 }

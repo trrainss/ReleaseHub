@@ -1,5 +1,12 @@
 import { supabase } from '@/shared/lib/supabase';
 import type { Release, ReleaseChange, ReleaseReviewer, Comment, ActivityEvent } from '@/shared/types';
+import {
+  mapReleaseRowToRelease,
+  mapChangeRowToChange,
+  mapReviewerRowToReviewer,
+  mapCommentRowToComment,
+  mapActivityRowToActivity,
+} from '@/shared/lib/mappers';
 
 export async function updateReleaseWithConflictCheck(
   releaseId: string,
@@ -20,7 +27,7 @@ export async function updateReleaseWithConflictCheck(
 export async function getReleases(productId: string, filters?: { status?: string; search?: string; sort?: string; page?: number; perPage?: number }) {
   let query = supabase
     .from('releases')
-    .select('*, release_changes(count)', { count: 'exact' })
+    .select('*, release_changes(count), release_reviewers(count)', { count: 'exact' })
     .eq('product_id', productId);
 
   if (filters?.status) {
@@ -41,7 +48,7 @@ export async function getReleases(productId: string, filters?: { status?: string
 
   const { data, error, count } = await query.range(from, to);
   if (error) throw error;
-  return { data: data ?? [], count: count ?? 0 };
+  return { data: (data ?? []).map(mapReleaseRowToRelease), count: count ?? 0 };
 }
 
 export async function getRelease(id: string): Promise<Release | null> {
@@ -58,7 +65,7 @@ export async function getRelease(id: string): Promise<Release | null> {
     .eq('id', id)
     .single();
   if (error) throw error;
-  return data;
+  return data ? mapReleaseRowToRelease(data) : null;
 }
 
 export async function createRelease(release: Omit<Release, 'id' | 'created_at' | 'updated_at' | 'status' | 'row_version'>) {
@@ -68,19 +75,12 @@ export async function createRelease(release: Omit<Release, 'id' | 'created_at' |
     .select()
     .single();
   if (error) throw error;
-  return data;
+  return data ? mapReleaseRowToRelease(data) : null;
 }
 
-export async function updateRelease(id: string, updates: Partial<Omit<Release, 'id' | 'created_at' | 'updated_at' | 'row_version'>>) {
-  const { data, error } = await supabase
-    .from('releases')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
+// NOTE: updateRelease removed for security — use updateReleaseWithConflictCheck (RPC) instead
+// Direct updates bypass RLS role checks and can modify protected fields (status, version, published_at).
+// The RPC variant validates role, status machine, and uses optimistic locking.
 
 export async function deleteRelease(id: string) {
   const { error } = await supabase
@@ -91,51 +91,22 @@ export async function deleteRelease(id: string) {
 }
 
 export async function submitForReview(releaseId: string, reviewerIds: string[]) {
-    console.log('🔵 submitForReview called with:');
-    console.log('  releaseId:', releaseId);
-    console.log('  reviewerIds:', reviewerIds);
-    console.log('  reviewerIds type:', typeof reviewerIds);
-    console.log('  is array:', Array.isArray(reviewerIds));
-    console.log('  length:', reviewerIds?.length);
-
-    // Проверяем, что reviewerIds - это массив и не пустой
     if (!reviewerIds || !Array.isArray(reviewerIds) || reviewerIds.length === 0) {
-        const error = new Error('At least one reviewer must be selected');
-        console.error('🔴 Validation error:', error);
-        throw error;
+        throw new Error('At least one reviewer must be selected');
     }
 
-    // Проверяем, что все ID - это строки
     const invalidIds = reviewerIds.filter(id => typeof id !== 'string' || id.length === 0);
     if (invalidIds.length > 0) {
-        const error = new Error(`Invalid reviewer IDs: ${JSON.stringify(invalidIds)}`);
-        console.error(' Invalid IDs:', invalidIds);
-        throw error;
+        throw new Error(`Invalid reviewer IDs: ${JSON.stringify(invalidIds)}`);
     }
 
-    try {
-        const { data, error } = await supabase.rpc('submit_release_for_review', {
-            p_release_id: releaseId,
-            p_reviewer_ids: reviewerIds,
-        });
-        
-        if (error) {
-            console.error(' Supabase RPC error:', error);
-            console.error(' Error details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-                hint: error.hint
-            });
-            throw new Error(`Failed to submit: ${error.message}`);
-        }
-        
-        console.log(' Submit successful:', data);
-        return data;
-    } catch (err) {
-        console.error(' Unexpected error:', err);
-        throw err;
-    }
+    const { data, error } = await supabase.rpc('submit_release_for_review', {
+        p_release_id: releaseId,
+        p_reviewer_ids: reviewerIds,
+    });
+
+    if (error) throw new Error(`Failed to submit: ${error.message}`);
+    return data;
 }
 
 export async function approveRelease(releaseId: string) {
@@ -163,7 +134,7 @@ export async function getChanges(releaseId: string): Promise<ReleaseChange[]> {
     .eq('release_id', releaseId)
     .order('position');
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(mapChangeRowToChange);
 }
 
 export async function createChange(change: Omit<ReleaseChange, 'id' | 'created_at' | 'updated_at'>) {
@@ -173,7 +144,7 @@ export async function createChange(change: Omit<ReleaseChange, 'id' | 'created_a
     .select()
     .single();
   if (error) throw error;
-  return data;
+  return data ? mapChangeRowToChange(data) : null;
 }
 
 export async function updateChange(id: string, updates: Partial<Omit<ReleaseChange, 'id' | 'created_at' | 'updated_at'>>) {
@@ -203,7 +174,7 @@ export async function getReviewers(releaseId: string): Promise<(ReleaseReviewer 
     .select('*, profile:profiles!user_id(display_name, avatar_url)')
     .eq('release_id', releaseId);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(mapReviewerRowToReviewer);
 }
 
 export async function getComments(releaseId: string): Promise<(Comment & { profile: { display_name: string; avatar_url: string | null } })[]> {
@@ -213,7 +184,7 @@ export async function getComments(releaseId: string): Promise<(Comment & { profi
     .eq('release_id', releaseId)
     .order('created_at');
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(mapCommentRowToComment);
 }
 
 export async function createComment(releaseId: string, userId: string, content: string) {
@@ -241,7 +212,7 @@ export async function getActivity(releaseId: string): Promise<ActivityEvent[]> {
     .eq('release_id', releaseId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(mapActivityRowToActivity);
 }
 
 export async function getWorkspaceActivity(workspaceId: string): Promise<ActivityEvent[]> {
@@ -252,7 +223,7 @@ export async function getWorkspaceActivity(workspaceId: string): Promise<Activit
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(mapActivityRowToActivity);
 }
 
 export async function getPublishedReleases(productSlug: string): Promise<Release[]> {
@@ -263,6 +234,58 @@ export async function getPublishedReleases(productSlug: string): Promise<Release
     .eq('status', 'published')
     .order('published_at', { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(mapReleaseRowToRelease);
+}
+
+export async function restoreRejectedToDraft(releaseId: string) {
+  const { error } = await supabase.rpc('restore_rejected_to_draft', { p_release_id: releaseId });
+  if (error) throw error;
+}
+
+export async function unpublishRelease(releaseId: string) {
+  const { error } = await supabase.rpc('unpublish_release', { p_release_id: releaseId });
+  if (error) throw error;
+}
+
+export async function getWorkspaceMembersForAssignment(workspaceId: string) {
+  const { data, error } = await supabase
+    .from('workspace_members')
+    .select(`
+      user_id,
+      role,
+      profiles:user_id (
+        display_name,
+        avatar_url
+      )
+    `)
+    .eq('workspace_id', workspaceId);
+  if (error) throw error;
+  // Supabase returns profiles as an array; unwrap to single object
+  return (data ?? []).map((item: { user_id: string; role: string; profiles: { display_name: string; avatar_url: string | null }[] | null }) => {
+    const profile = item.profiles?.[0] ?? null;
+    return {
+      user_id: item.user_id,
+      role: item.role,
+      profiles: profile,
+    };
+  });
+}
+
+export async function assignReviewers(releaseId: string, reviewerIds: string[]) {
+  await supabase
+    .from('release_reviewers')
+    .delete()
+    .eq('release_id', releaseId);
+
+  if (reviewerIds.length === 0) return;
+
+  const { error } = await supabase
+    .from('release_reviewers')
+    .insert(reviewerIds.map(user_id => ({
+      release_id: releaseId,
+      user_id,
+    })));
+
+  if (error) throw error;
 }
 

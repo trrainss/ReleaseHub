@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/shared/lib/supabase';
+import { getWorkspaceMembersForAssignment, assignReviewers } from '@/shared/api/releases';
 import { Button } from '@/shared/ui/Button';
 import { Modal } from '@/shared/ui/Modal';
 import { useToast } from '@/shared/ui/Toast';
@@ -21,42 +21,12 @@ export function AssignReviewers({ releaseId, workspaceId, currentReviewers, onAs
 
     const { data: members, isLoading } = useQuery({
         queryKey: ['workspace-members', workspaceId],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('workspace_members')
-                .select(`
-                    user_id,
-                    role,
-                    profiles:user_id (
-                        display_name,
-                        avatar_url
-                    )
-                `)
-                .eq('workspace_id', workspaceId);
-            if (error) throw error;
-            return data || [];
-        },
+        queryFn: () => getWorkspaceMembersForAssignment(workspaceId),
         enabled: !!workspaceId,
     });
 
     const assignMutation = useMutation({
-        mutationFn: async (reviewerIds: string[]) => {
-            await supabase
-                .from('release_reviewers')
-                .delete()
-                .eq('release_id', releaseId);
-
-            if (reviewerIds.length === 0) return;
-
-            const { error } = await supabase
-                .from('release_reviewers')
-                .insert(reviewerIds.map(user_id => ({
-                    release_id: releaseId,
-                    user_id,
-                })));
-
-            if (error) throw error;
-        },
+        mutationFn: (reviewerIds: string[]) => assignReviewers(releaseId, reviewerIds),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: releaseKeys.reviewers(releaseId) });
             addToast('Reviewers assigned successfully', 'success');
@@ -105,7 +75,7 @@ export function AssignReviewers({ releaseId, workspaceId, currentReviewers, onAs
                         </div>
                     ) : (
                         <div style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: 'var(--space-lg)' }}>
-                            {members?.map((member: any) => (
+                            {members?.map((member) => (
                                 <label
                                     key={member.user_id}
                                     style={{

@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/shared/lib/supabase';
 import { Button } from '@/shared/ui/Button';
 import { LoadingSpinner } from '@/shared/ui/LoadingSpinner';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { useToast } from '@/shared/ui/Toast';
+import { getInviteByToken, acceptInvite } from '@/shared/api/workspaces';
+
+interface InviteData {
+  id: string;
+  workspace_id: string;
+  email: string;
+  role: string;
+  token_hash: string;
+  status: string;
+  expires_at: string;
+  invited_by: string;
+  created_at: string;
+  workspaces?: { name: string } | null;
+}
 
 export function AcceptInvitePage() {
     const [searchParams] = useSearchParams();
@@ -13,46 +26,35 @@ export function AcceptInvitePage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { addToast } = useToast();
-    const [inviteData, setInviteData] = useState<any>(null);
-    const [error, setError] = useState('');
+    const [inviteData, setInviteData] = useState<InviteData | null>(null);
+    const [error, setError] = useState(() => (!token ? 'Invalid invite link' : ''));
 
     useEffect(() => {
         if (!token) {
-            setError('Invalid invite link');
             return;
         }
 
         const checkInvite = async () => {
-            const { data, error } = await supabase
-                .from('workspace_invites')
-                .select('*, workspaces(name)')
-                .eq('token_hash', token)
-                .eq('status', 'pending')
-                .single();
+            const data = await getInviteByToken(token);
 
-            if (error || !data) {
+            if (!data) {
                 setError('Invite is invalid or expired');
                 return;
             }
 
-            setInviteData(data);
+            setInviteData(data as unknown as InviteData);
         };
 
         checkInvite();
     }, [token]);
 
     const acceptMutation = useMutation({
-        mutationFn: async () => {
-            const { error } = await supabase.rpc('accept_invite', {
-                p_token_hash: token,
-            });
-            if (error) throw error;
-        },
+        mutationFn: () => acceptInvite(token!),
         onSuccess: () => {
             addToast('Successfully joined the workspace!', 'success');
             navigate('/workspaces');
         },
-        onError: (err: any) => {
+        onError: (err: Error) => {
             setError(err.message || 'Failed to accept invite');
             addToast(err.message || 'Failed to accept invite', 'error');
         },
@@ -93,7 +95,6 @@ export function AcceptInvitePage() {
         <div className="auth-page">
             <div className="auth-form">
                 <div style={{ textAlign: 'center', marginBottom: 'var(--space-2xl)' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-lg)', opacity: 0.6 }}>🏢</div>
                     <h1 className="auth-form__title">Join Workspace</h1>
                     <p className="auth-form__subtitle">
                         You've been invited to join <strong>{inviteData.workspaces?.name || 'a workspace'}</strong>

@@ -28,7 +28,7 @@ export function SignInForm() {
     setLoading(true);
     try {
       await signIn(data.email, data.password);
-      addToast('Добро пожаловать!', 'success');
+      addToast('Welcome back!', 'success');
       navigate('/workspaces');
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Ошибка входа', 'error');

@@ -1,11 +1,19 @@
-import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { createComment, deleteComment } from '@/shared/api/releases';
 import { Button } from '@/shared/ui/Button';
 import { useToast } from '@/shared/ui/Toast';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { releaseKeys } from '@/shared/lib/queryKeys';
 import type { Comment } from '@/shared/types';
+
+const commentSchema = z.object({
+  content: z.string().min(1, 'Comment cannot be empty'),
+});
+
+type CommentFormData = z.infer<typeof commentSchema>;
 
 interface CommentSectionProps {
   releaseId: string;
@@ -16,13 +24,16 @@ export function CommentSection({ releaseId, comments }: CommentSectionProps) {
   const { user } = useAuth();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
-  const [content, setContent] = useState('');
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentFormData>({
+    resolver: zodResolver(commentSchema),
+  });
 
   const createMutation = useMutation({
-    mutationFn: () => createComment(releaseId, user!.id, content),
+    mutationFn: (data: CommentFormData) => createComment(releaseId, user!.id, data.content),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: releaseKeys.comments(releaseId) });
-      setContent('');
+      reset();
       addToast('Comment added', 'success');
     },
     onError: (err) => addToast(err instanceof Error ? err.message : 'Failed to add comment', 'error'),
@@ -39,22 +50,22 @@ export function CommentSection({ releaseId, comments }: CommentSectionProps) {
 
   return (
     <div className="comment-section">
-      <div className="comment-section__input">
+      <form onSubmit={handleSubmit((data) => createMutation.mutate(data))} className="comment-section__input">
         <textarea
           className="input"
           placeholder="Write a comment..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
+          {...register('content')}
           rows={3}
         />
+        {errors.content && <p className="input-group__error">{errors.content.message}</p>}
         <Button
-          onClick={() => createMutation.mutate()}
+          type="submit"
           loading={createMutation.isPending}
-          disabled={!content.trim()}
+          disabled={createMutation.isPending}
         >
           Send
         </Button>
-      </div>
+      </form>
       <div className="comment-section__list">
         {comments.map((comment) => (
           <div key={comment.id} className="comment">

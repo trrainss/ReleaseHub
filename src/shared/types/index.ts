@@ -80,6 +80,10 @@ export interface Release {
         name: string;
         slug: string;
     };
+    /** Subquery result: count of changes (list queries) or full change array (published releases) */
+    release_changes?: { count: number } | ReleaseChange[];
+    /** Subquery result: count of reviewers (available in list queries) */
+    release_reviewers?: { count: number };
 }
 
 export interface ReleaseChange {

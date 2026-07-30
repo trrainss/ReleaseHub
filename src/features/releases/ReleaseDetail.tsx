@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { getRelease, submitForReview, publishRelease, deleteRelease, getChanges, getReviewers, getComments, getActivity } from '@/shared/api/releases';
+import { getRelease, submitForReview, publishRelease, deleteRelease, getChanges, getReviewers, getComments, getActivity, restoreRejectedToDraft, unpublishRelease } from '@/shared/api/releases';
+import { getWorkspaceMember } from '@/shared/api/workspaces';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { Button } from '@/shared/ui/Button';
 import { LoadingSpinner } from '@/shared/ui/LoadingSpinner';
@@ -9,7 +10,7 @@ import { ErrorMessage } from '@/shared/ui/ErrorMessage';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Modal } from '@/shared/ui/Modal';
 import { useToast } from '@/shared/ui/Toast';
-import { releaseKeys } from '@/shared/lib/queryKeys';
+import { releaseKeys, workspaceKeys } from '@/shared/lib/queryKeys';
 import { ChangeList } from '@/features/changes/ChangeList';
 import { CreateChangeForm } from '@/features/changes/CreateChangeForm';
 import { ApprovalPanel } from '@/features/approvals/ApprovalPanel';
@@ -17,6 +18,7 @@ import { CommentSection } from '@/features/comments/CommentSection';
 import { ActivityLog } from '@/features/comments/ActivityLog';
 import { useRealtimeRelease } from '@/shared/hooks/useRealtimeSubscription';
 import { AssignReviewers } from '@/features/approvals/AssignReviewers';
+import { canPublish, canSubmitForReview, canDeleteRelease } from '@/shared/lib/roles';
 
 export function ReleaseDetail() {
   const { releaseId } = useParams<{ releaseId: string }>();
@@ -29,11 +31,21 @@ export function ReleaseDetail() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [conflictError, setConflictError] = useState(false);
 
   const { data: release, isLoading, isError, error, refetch } = useQuery({
     queryKey: releaseKeys.detail(releaseId!),
     queryFn: () => getRelease(releaseId!),
     enabled: !!releaseId,
+  });
+
+  const { data: membership } = useQuery({
+    queryKey: [...workspaceKeys.members(release?.products?.workspace_id ?? ''), user?.id],
+    queryFn: async () => {
+      if (!release?.products?.workspace_id || !user) return null;
+      return getWorkspaceMember(release.products.workspace_id, user.id);
+    },
+    enabled: !!release && !!user && !!release.products?.workspace_id,
   });
 
   const { data: changes } = useQuery({
@@ -65,19 +77,29 @@ export function ReleaseDetail() {
   if (isLoading) return <LoadingSpinner size="lg" />;
   if (isError || !release) return <ErrorMessage message={error instanceof Error ? error.message : 'Release not found'} onRetry={refetch} />;
 
+  const userRole = membership?.role ?? null;
+  const canSubmit = userRole ? canSubmitForReview(userRole) : false;
+  const canPublishAction = userRole ? canPublish(userRole) : false;
+  const canDelete = userRole ? canDeleteRelease(userRole) : false;
+
   const handleSubmit = async () => {
     if (!reviewers?.length) {
       addToast('Assign at least one reviewer before submitting', 'error');
       return;
     }
     setSubmitLoading(true);
+    setConflictError(false);
     try {
       await submitForReview(release.id, reviewers.map((r) => r.user_id));
       queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
       queryClient.invalidateQueries({ queryKey: releaseKeys.activity(release.id) });
       addToast('Release submitted for review', 'success');
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to submit', 'error');
+      const message = err instanceof Error ? err.message : 'Failed to submit';
+      if (message.includes('Conflict') || message.includes('row_version')) {
+        setConflictError(true);
+      }
+      addToast(message, 'error');
     } finally {
       setSubmitLoading(false);
     }
@@ -85,13 +107,18 @@ export function ReleaseDetail() {
 
   const handlePublish = async () => {
     setPublishLoading(true);
+    setConflictError(false);
     try {
       await publishRelease(release.id);
       queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
       queryClient.invalidateQueries({ queryKey: releaseKeys.activity(release.id) });
       addToast('Release published', 'success');
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to publish', 'error');
+      const message = err instanceof Error ? err.message : 'Failed to publish';
+      if (message.includes('Conflict') || message.includes('row_version')) {
+        setConflictError(true);
+      }
+      addToast(message, 'error');
     } finally {
       setPublishLoading(false);
     }
@@ -110,8 +137,37 @@ export function ReleaseDetail() {
     }
   };
 
+  const handleRestoreRejected = async () => {
+    try {
+      await restoreRejectedToDraft(release.id);
+      queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
+      addToast('Release restored to draft', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to restore', 'error');
+    }
+  };
+
+  const handleUnpublish = async () => {
+    try {
+      await unpublishRelease(release.id);
+      queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
+      addToast('Release unpublished', 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to unpublish', 'error');
+    }
+  };
+
   return (
     <div className="release-detail">
+      {conflictError && (
+        <div className="conflict-banner">
+          <span>This release was modified by another user.</span>
+          <Button size="sm" onClick={() => { refetch(); setConflictError(false); }}>
+            Reload data
+          </Button>
+        </div>
+      )}
+
       <div className="release-detail__header">
         <div>
           <h1>{release.title}</h1>
@@ -122,23 +178,37 @@ export function ReleaseDetail() {
 
       {release.description && <p className="release-detail__description">{release.description}</p>}
 
-      {release.status === 'draft' && (
-        <Button onClick={handleSubmit} loading={submitLoading}>
-          Submit for Review
-        </Button>
-      )}
+      <div className="release-detail__actions">
+        {release.status === 'draft' && canSubmit && (
+          <Button onClick={handleSubmit} loading={submitLoading}>
+            Submit for Review
+          </Button>
+        )}
 
-      {release.status === 'approved' && (
-        <Button onClick={handlePublish} loading={publishLoading}>
-          Publish Release
-        </Button>
-      )}
+        {release.status === 'approved' && canPublishAction && (
+          <Button onClick={handlePublish} loading={publishLoading}>
+            Publish Release
+          </Button>
+        )}
 
-      {release.status === 'draft' && (
-        <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
-          Delete Release
-        </Button>
-      )}
+        {release.status === 'rejected' && canSubmit && (
+          <Button onClick={handleRestoreRejected}>
+            Restore to Draft
+          </Button>
+        )}
+
+        {release.status === 'published' && userRole === 'owner' && (
+          <Button variant="ghost" onClick={handleUnpublish}>
+            Unpublish
+          </Button>
+        )}
+
+        {release.status === 'draft' && canDelete && (
+          <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+            Delete Release
+          </Button>
+        )}
+      </div>
 
       <div className="release-detail__sections">
         <section>
@@ -152,7 +222,7 @@ export function ReleaseDetail() {
         <section>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-base)' }}>
             <h2>Reviewers & Approval</h2>
-            {release.status === 'draft' && (
+            {release.status === 'draft' && canSubmit && (
               <AssignReviewers
                 releaseId={release.id}
                 workspaceId={release.products?.workspace_id ?? ''}
