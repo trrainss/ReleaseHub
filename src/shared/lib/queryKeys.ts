@@ -9,6 +9,7 @@ export const releaseKeys = {
   reviewers: (releaseId: string) => [...releaseKeys.all, 'reviewers', releaseId] as const,
   comments: (releaseId: string) => [...releaseKeys.all, 'comments', releaseId] as const,
   activity: (releaseId: string) => [...releaseKeys.all, 'activity', releaseId] as const,
+  publicNotes: (productSlug: string) => [...releaseKeys.all, 'public', productSlug] as const,
 };
 
 export const workspaceKeys = {
@@ -16,6 +17,9 @@ export const workspaceKeys = {
   list: () => [...workspaceKeys.all, 'list'] as const,
   detail: (id: string) => [...workspaceKeys.all, 'detail', id] as const,
   members: (id: string) => [...workspaceKeys.all, 'members', id] as const,
+  member: (workspaceId: string, userId: string) =>
+    [...workspaceKeys.all, 'member', workspaceId, userId] as const,
+  assignmentMembers: (id: string) => [...workspaceKeys.all, 'assignmentMembers', id] as const,
   invites: (id: string) => [...workspaceKeys.all, 'invites', id] as const,
   products: (id: string) => [...workspaceKeys.all, 'products', id] as const,
   activity: (id: string) => [...workspaceKeys.all, 'activity', id] as const,

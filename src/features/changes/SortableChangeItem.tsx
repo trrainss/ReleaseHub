@@ -6,10 +6,11 @@ import type { ReleaseChange } from '@/shared/types';
 interface SortableChangeItemProps {
   change: ReleaseChange;
   isDraggable: boolean;
+  canDelete: boolean;
   onDelete: () => void;
 }
 
-export function SortableChangeItem({ change, isDraggable, onDelete }: SortableChangeItemProps) {
+export function SortableChangeItem({ change, isDraggable, canDelete, onDelete }: SortableChangeItemProps) {
   const {
     attributes,
     listeners,
@@ -41,7 +42,7 @@ export function SortableChangeItem({ change, isDraggable, onDelete }: SortableCh
         </div>
         <p className="change-item__description">{change.description}</p>
       </div>
-      {isDraggable && (
+      {isDraggable && canDelete && (
         <Button variant="ghost" size="sm" onClick={onDelete}>
           &times;
         </Button>

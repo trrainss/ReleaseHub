@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Routes, Route, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { getWorkspace, getWorkspaceMember, getProducts, createProduct, updateWorkspace } from '@/shared/api/workspaces';
@@ -27,7 +27,7 @@ export function WorkspacePage() {
   const [showInvite, setShowInvite] = useState(false);
   const [showCreateProduct, setShowCreateProduct] = useState(false);
   const [productForm, setProductForm] = useState({ name: '', slug: '', description: '' });
-  const [editWorkspaceName, setEditWorkspaceName] = useState('');
+  const [editWorkspaceName, setEditWorkspaceName] = useState<string | undefined>(undefined);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const { data: workspace, isLoading: wsLoading, isError: wsError, error: wsErrorData, refetch: wsRefetch } = useQuery({
@@ -58,6 +58,33 @@ export function WorkspacePage() {
   const canManage = canManageMembers(userRole as Role);
   const canManageWs = canManageWorkspace(userRole as Role);
 
+  // --- useMutation: Update workspace ---
+  const updateWorkspaceMutation = useMutation({
+    mutationFn: (name: string) => updateWorkspace(workspaceId!, { name }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId!) });
+      addToast('Workspace updated', 'success');
+    },
+    onError: (err) => {
+      addToast(err instanceof Error ? err.message : 'Failed to update workspace', 'error');
+    },
+  });
+
+  // --- useMutation: Create product ---
+  const createProductMutation = useMutation({
+    mutationFn: (data: { name: string; slug: string; description?: string }) =>
+      createProduct(workspaceId!, data.name, data.slug, data.description),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.products(workspaceId!) });
+      addToast('Product created', 'success');
+      setShowCreateProduct(false);
+      setProductForm({ name: '', slug: '', description: '' });
+    },
+    onError: (err) => {
+      addToast(err instanceof Error ? err.message : 'Failed to create product', 'error');
+    },
+  });
+
   // Determine active product
   const activeProduct = selectedProductId
     ? products?.find(p => p.id === selectedProductId)
@@ -69,29 +96,6 @@ export function WorkspacePage() {
   if (!membership) {
     return <ErrorMessage message="You don't have access to this workspace." />;
   }
-
-  const handleCreateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await createProduct(workspaceId!, productForm.name, productForm.slug, productForm.description || undefined);
-      addToast('Product created', 'success');
-      setShowCreateProduct(false);
-      setProductForm({ name: '', slug: '', description: '' });
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.products(workspaceId!) });
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to create product', 'error');
-    }
-  };
-
-  const handleUpdateWorkspace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateWorkspace(workspaceId!, { name: editWorkspaceName });
-      addToast('Workspace updated', 'success');
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to update workspace', 'error');
-    }
-  };
 
   return (
     <div className="page">
@@ -171,13 +175,19 @@ export function WorkspacePage() {
           canManageWs ? (
             <div>
               <h2>Workspace Settings</h2>
-              <form onSubmit={handleUpdateWorkspace} className="modal-form">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = (editWorkspaceName ?? workspace.name).trim();
+                if (!trimmed) return;
+                updateWorkspaceMutation.mutate(trimmed);
+              }} className="modal-form">
                 <Input
                   label="Workspace Name"
-                  value={editWorkspaceName || workspace.name}
+                  value={editWorkspaceName ?? workspace.name}
                   onChange={(e) => setEditWorkspaceName(e.target.value)}
+                  onFocus={() => setEditWorkspaceName(prev => prev ?? workspace.name)}
                 />
-                <Button type="submit">Save Changes</Button>
+                <Button type="submit" loading={updateWorkspaceMutation.isPending}>Save Changes</Button>
               </form>
             </div>
           ) : <ErrorMessage message="Access denied" />
@@ -189,7 +199,13 @@ export function WorkspacePage() {
       </Modal>
 
       <Modal open={showCreateProduct} onClose={() => setShowCreateProduct(false)} title="Create Product">
-        <form onSubmit={handleCreateProduct} className="modal-form">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const name = productForm.name.trim();
+          const slug = productForm.slug.trim();
+          if (!name || !slug) return;
+          createProductMutation.mutate({ name, slug, description: productForm.description || undefined });
+        }} className="modal-form">
           <Input
             label="Name"
             value={productForm.name}
@@ -209,7 +225,7 @@ export function WorkspacePage() {
             onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
           />
           <div className="modal__actions">
-            <Button type="submit">Create Product</Button>
+            <Button type="submit" loading={createProductMutation.isPending}>Create Product</Button>
             <Button type="button" variant="ghost" onClick={() => setShowCreateProduct(false)}>Cancel</Button>
           </div>
         </form>

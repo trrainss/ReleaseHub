@@ -20,11 +20,10 @@ type FormData = z.infer<typeof schema>;
 
 interface CreateReleaseFormProps {
   productId: string;
-  createdBy: string;
   onSuccess?: () => void;
 }
 
-export function CreateReleaseForm({ productId, createdBy, onSuccess }: CreateReleaseFormProps) {
+export function CreateReleaseForm({ productId, onSuccess }: CreateReleaseFormProps) {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -36,13 +35,11 @@ export function CreateReleaseForm({ productId, createdBy, onSuccess }: CreateRel
   const mutation = useMutation({
     mutationFn: (data: FormData) =>
       createRelease({
-        product_id: data.product_id,
+        productId: data.product_id,
         version: data.version,
         title: data.title,
-        description: data.description ?? null,
-        planned_at: data.planned_at ?? null,
-        published_at: null,
-        created_by: createdBy,
+        description: data.description ?? undefined,
+        plannedAt: data.planned_at ?? undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: releaseKeys.lists() });

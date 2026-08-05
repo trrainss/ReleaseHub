@@ -41,7 +41,7 @@ export function MemberList({ workspaceId, userRole }: MemberListProps) {
   });
 
   const roleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) => updateMemberRole(workspaceId, userId, role),
+    mutationFn: ({ userId, role }: { userId: string; role: Role }) => updateMemberRole(workspaceId, userId, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
       addToast('Role updated', 'success');
@@ -70,7 +70,7 @@ export function MemberList({ workspaceId, userRole }: MemberListProps) {
               <Select
                 value={member.role}
                 onChange={(e) =>
-                  roleMutation.mutate({ userId: member.user_id, role: e.target.value })
+                  roleMutation.mutate({ userId: member.user_id, role: e.target.value as Role })
                 }
                 options={[
                   { value: 'owner', label: 'Owner' },

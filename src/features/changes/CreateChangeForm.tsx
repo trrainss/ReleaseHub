@@ -19,12 +19,11 @@ type FormData = z.infer<typeof schema>;
 
 interface CreateChangeFormProps {
   releaseId: string;
-  userId: string;
   position: number;
   onSuccess?: () => void;
 }
 
-export function CreateChangeForm({ releaseId, userId, position, onSuccess }: CreateChangeFormProps) {
+export function CreateChangeForm({ releaseId, position, onSuccess }: CreateChangeFormProps) {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -41,7 +40,6 @@ export function CreateChangeForm({ releaseId, userId, position, onSuccess }: Cre
         description: data.description,
         category: data.category,
         position,
-        created_by: userId,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: releaseKeys.changes(releaseId) });

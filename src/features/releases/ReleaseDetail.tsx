@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { getRelease, submitForReview, publishRelease, deleteRelease, getChanges, getReviewers, getComments, getActivity, restoreRejectedToDraft, unpublishRelease } from '@/shared/api/releases';
@@ -18,7 +18,8 @@ import { CommentSection } from '@/features/comments/CommentSection';
 import { ActivityLog } from '@/features/comments/ActivityLog';
 import { useRealtimeRelease } from '@/shared/hooks/useRealtimeSubscription';
 import { AssignReviewers } from '@/features/approvals/AssignReviewers';
-import { canPublish, canSubmitForReview, canDeleteRelease } from '@/shared/lib/roles';
+import { canPublish, canSubmitForReview, canDeleteRelease, canCreateChange } from '@/shared/lib/roles';
+import { ConflictError } from '@/shared/lib/errors';
 
 export function ReleaseDetail() {
   const { releaseId } = useParams<{ releaseId: string }>();
@@ -28,19 +29,16 @@ export function ReleaseDetail() {
   const queryClient = useQueryClient();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCreateChange, setShowCreateChange] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [publishLoading, setPublishLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [conflictError, setConflictError] = useState(false);
 
   const { data: release, isLoading, isError, error, refetch } = useQuery({
-    queryKey: releaseKeys.detail(releaseId!),
-    queryFn: () => getRelease(releaseId!),
+    queryKey: releaseId ? releaseKeys.detail(releaseId) : ['skip'],
+    queryFn: releaseId ? () => getRelease(releaseId) : skipToken,
     enabled: !!releaseId,
   });
 
   const { data: membership } = useQuery({
-    queryKey: [...workspaceKeys.members(release?.products?.workspace_id ?? ''), user?.id],
+    queryKey: workspaceKeys.members(release?.products?.workspace_id ?? ''),
     queryFn: async () => {
       if (!release?.products?.workspace_id || !user) return null;
       return getWorkspaceMember(release.products.workspace_id, user.id);
@@ -72,90 +70,100 @@ export function ReleaseDetail() {
     enabled: !!releaseId,
   });
 
-  useRealtimeRelease(releaseId!);
-
-  if (isLoading) return <LoadingSpinner size="lg" />;
-  if (isError || !release) return <ErrorMessage message={error instanceof Error ? error.message : 'Release not found'} onRetry={refetch} />;
+  const { deletedRemotely, resetDeleted } = useRealtimeRelease(releaseId);
 
   const userRole = membership?.role ?? null;
   const canSubmit = userRole ? canSubmitForReview(userRole) : false;
   const canPublishAction = userRole ? canPublish(userRole) : false;
   const canDelete = userRole ? canDeleteRelease(userRole) : false;
+  const canAddChange = userRole ? canCreateChange(userRole) : false;
 
-  const handleSubmit = async () => {
-    if (!reviewers?.length) {
-      addToast('Assign at least one reviewer before submitting', 'error');
-      return;
-    }
-    setSubmitLoading(true);
-    setConflictError(false);
-    try {
-      await submitForReview(release.id, reviewers.map((r) => r.user_id));
-      queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
-      queryClient.invalidateQueries({ queryKey: releaseKeys.activity(release.id) });
+  // --- useMutation: Submit for Review ---
+  const submitMutation = useMutation({
+    mutationFn: () => {
+      if (!reviewers?.length) {
+        throw new Error('Assign at least one reviewer before submitting');
+      }
+      return submitForReview(release!.id, reviewers.map((r) => r.user_id));
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release!.id) }),
+        queryClient.invalidateQueries({ queryKey: releaseKeys.activity(release!.id) }),
+      ]);
       addToast('Release submitted for review', 'success');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to submit';
-      if (message.includes('Conflict') || message.includes('row_version')) {
+    },
+    onError: (err) => {
+      if (err instanceof ConflictError) {
         setConflictError(true);
       }
-      addToast(message, 'error');
-    } finally {
-      setSubmitLoading(false);
-    }
-  };
+      addToast(err instanceof Error ? err.message : 'Failed to submit', 'error');
+    },
+  });
 
-  const handlePublish = async () => {
-    setPublishLoading(true);
-    setConflictError(false);
-    try {
-      await publishRelease(release.id);
-      queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
-      queryClient.invalidateQueries({ queryKey: releaseKeys.activity(release.id) });
+  // --- useMutation: Publish ---
+  const publishMutation = useMutation({
+    mutationFn: () => publishRelease(release!.id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release!.id) }),
+        queryClient.invalidateQueries({ queryKey: releaseKeys.activity(release!.id) }),
+      ]);
       addToast('Release published', 'success');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to publish';
-      if (message.includes('Conflict') || message.includes('row_version')) {
+    },
+    onError: (err) => {
+      if (err instanceof ConflictError) {
         setConflictError(true);
       }
-      addToast(message, 'error');
-    } finally {
-      setPublishLoading(false);
-    }
-  };
+      addToast(err instanceof Error ? err.message : 'Failed to publish', 'error');
+    },
+  });
 
-  const handleDelete = async () => {
-    setDeleteLoading(true);
-    try {
-      await deleteRelease(release.id);
+  // --- useMutation: Delete ---
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteRelease(release!.id),
+    onSuccess: () => {
       addToast('Release deleted', 'success');
       navigate(-1);
-    } catch (err) {
+    },
+    onError: (err) => {
       addToast(err instanceof Error ? err.message : 'Failed to delete', 'error');
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
+    },
+  });
 
-  const handleRestoreRejected = async () => {
-    try {
-      await restoreRejectedToDraft(release.id);
-      queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
+  // --- useMutation: Restore to Draft ---
+  const restoreMutation = useMutation({
+    mutationFn: () => restoreRejectedToDraft(release!.id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release!.id) });
       addToast('Release restored to draft', 'success');
-    } catch (err) {
+    },
+    onError: (err) => {
       addToast(err instanceof Error ? err.message : 'Failed to restore', 'error');
-    }
-  };
+    },
+  });
 
-  const handleUnpublish = async () => {
-    try {
-      await unpublishRelease(release.id);
-      queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release.id) });
+  // --- useMutation: Unpublish ---
+  const unpublishMutation = useMutation({
+    mutationFn: () => unpublishRelease(release!.id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: releaseKeys.detail(release!.id) });
       addToast('Release unpublished', 'success');
-    } catch (err) {
+    },
+    onError: (err) => {
       addToast(err instanceof Error ? err.message : 'Failed to unpublish', 'error');
-    }
-  };
+    },
+  });
+
+  // --- Early returns (after all hooks) ---
+  if (isLoading) return <LoadingSpinner size="lg" />;
+  if (isError || !release) return <ErrorMessage message={error instanceof Error ? error.message : 'Release not found'} onRetry={refetch} />;
+  if (deletedRemotely) {
+    resetDeleted();
+    navigate(-1);
+    addToast('This release was deleted by another user', 'error');
+    return null;
+  }
 
   return (
     <div className="release-detail">
@@ -180,31 +188,31 @@ export function ReleaseDetail() {
 
       <div className="release-detail__actions">
         {release.status === 'draft' && canSubmit && (
-          <Button onClick={handleSubmit} loading={submitLoading}>
+          <Button onClick={() => submitMutation.mutate()} loading={submitMutation.isPending}>
             Submit for Review
           </Button>
         )}
 
         {release.status === 'approved' && canPublishAction && (
-          <Button onClick={handlePublish} loading={publishLoading}>
+          <Button onClick={() => publishMutation.mutate()} loading={publishMutation.isPending}>
             Publish Release
           </Button>
         )}
 
         {release.status === 'rejected' && canSubmit && (
-          <Button onClick={handleRestoreRejected}>
+          <Button onClick={() => restoreMutation.mutate()} loading={restoreMutation.isPending}>
             Restore to Draft
           </Button>
         )}
 
         {release.status === 'published' && userRole === 'owner' && (
-          <Button variant="ghost" onClick={handleUnpublish}>
+          <Button variant="ghost" onClick={() => unpublishMutation.mutate()} loading={unpublishMutation.isPending}>
             Unpublish
           </Button>
         )}
 
         {release.status === 'draft' && canDelete && (
-          <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+          <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} loading={deleteMutation.isPending}>
             Delete Release
           </Button>
         )}
@@ -213,8 +221,8 @@ export function ReleaseDetail() {
       <div className="release-detail__sections">
         <section>
           <h2>Changes</h2>
-          {changes && <ChangeList changes={changes} releaseId={release.id} status={release.status} />}
-          {release.status === 'draft' && (
+          {changes && <ChangeList changes={changes} releaseId={release.id} status={release.status} canDeleteChange={() => canDelete} />}
+          {release.status === 'draft' && canAddChange && (
             <Button size="sm" onClick={() => setShowCreateChange(true)}>Add Change</Button>
           )}
         </section>
@@ -256,20 +264,21 @@ export function ReleaseDetail() {
       <Modal open={showCreateChange} onClose={() => setShowCreateChange(false)} title="Add Change">
         <CreateChangeForm
           releaseId={release.id}
-          userId={user?.id ?? ''}
           position={(changes?.length ?? 0) + 1}
-          onSuccess={() => setShowCreateChange(false)}
+          onSuccess={() => {
+            setShowCreateChange(false);
+          }}
         />
       </Modal>
 
       <ConfirmDialog
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDelete}
+        onConfirm={() => deleteMutation.mutate()}
         title="Delete Release"
         message="Are you sure you want to delete this release? This cannot be undone."
         confirmLabel="Delete"
-        loading={deleteLoading}
+        loading={deleteMutation.isPending}
       />
     </div>
   );

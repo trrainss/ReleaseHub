@@ -30,7 +30,7 @@ export function CommentSection({ releaseId, comments }: CommentSectionProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CommentFormData) => createComment(releaseId, user!.id, data.content),
+    mutationFn: (data: CommentFormData) => createComment(releaseId, data.content),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: releaseKeys.comments(releaseId) });
       reset();

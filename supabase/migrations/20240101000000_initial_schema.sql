@@ -496,6 +496,55 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION replace_release_reviewers(p_release_id UUID, p_reviewer_ids UUID[])
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_workspace_id UUID;
+  v_status release_status;
+BEGIN
+  -- Validate caller role (owner/maintainer)
+  SELECT p.workspace_id INTO v_workspace_id
+  FROM products p
+  JOIN releases r ON r.product_id = p.id
+  WHERE r.id = p_release_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Release not found'; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM workspace_members
+    WHERE workspace_id = v_workspace_id AND user_id = auth.uid() AND role IN ('owner', 'maintainer')
+  ) THEN
+    RAISE EXCEPTION 'Only owners and maintainers can assign reviewers';
+  END IF;
+
+  -- Lock the release row to prevent concurrent review assignment
+  SELECT status INTO v_status FROM releases WHERE id = p_release_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Release not found'; END IF;
+  IF v_status NOT IN ('draft', 'review') THEN
+    RAISE EXCEPTION 'Reviewers can only be assigned to draft or review releases';
+  END IF;
+
+  -- Validate reviewer ids belong to workspace members
+  IF EXISTS (
+    SELECT 1 FROM unnest(p_reviewer_ids) AS rid
+    LEFT JOIN workspace_members wm ON wm.user_id = rid AND wm.workspace_id = v_workspace_id
+    WHERE wm.user_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'All reviewers must be members of the workspace';
+  END IF;
+
+  -- Atomic replace in a single transaction
+  DELETE FROM release_reviewers WHERE release_id = p_release_id;
+  IF array_length(p_reviewer_ids, 1) IS NOT NULL THEN
+    INSERT INTO release_reviewers (release_id, user_id)
+    SELECT p_release_id, rid FROM unnest(p_reviewer_ids) AS rid;
+  END IF;
+END;
+$$;
+
 -- Step 8: Realtime
 
 DO $$

@@ -39,7 +39,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('ChangeList', () => {
   it('renders changes', () => {
     renderWithProviders(
-      <ChangeList changes={mockChanges} releaseId="r1" status="draft" />,
+      <ChangeList changes={mockChanges} releaseId="r1" status="draft" canDeleteChange={() => true} />,
     );
     expect(screen.getByText('Change 1')).toBeInTheDocument();
     expect(screen.getByText('Change 2')).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('ChangeList', () => {
 
   it('shows category badges', () => {
     renderWithProviders(
-      <ChangeList changes={mockChanges} releaseId="r1" status="draft" />,
+      <ChangeList changes={mockChanges} releaseId="r1" status="draft" canDeleteChange={() => true} />,
     );
     expect(screen.getByText('feature')).toBeInTheDocument();
     expect(screen.getByText('bugfix')).toBeInTheDocument();

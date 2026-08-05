@@ -26,9 +26,11 @@ interface ChangeListProps {
   changes: ReleaseChange[];
   releaseId: string;
   status: ReleaseStatus;
+  /** Permission predicate evaluated per change. */
+  canDeleteChange: () => boolean;
 }
 
-export function ChangeList({ changes, releaseId, status }: ChangeListProps) {
+export function ChangeList({ changes, releaseId, status, canDeleteChange }: ChangeListProps) {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<ReleaseChange | null>(null);
@@ -101,6 +103,7 @@ export function ChangeList({ changes, releaseId, status }: ChangeListProps) {
               key={change.id}
               change={change}
               isDraggable={isDraggable}
+              canDelete={canDeleteChange()}
               onDelete={() => setDeleteTarget(change)}
             />
           ))}

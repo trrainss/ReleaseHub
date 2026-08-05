@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getReleases, createRelease } from '@/shared/api/releases';
-import { useAuth } from '@/shared/hooks/useAuth';
 import { Button } from '@/shared/ui/Button';
 import { Input } from '@/shared/ui/Input';
 import { Select } from '@/shared/ui/Select';
@@ -16,13 +15,8 @@ import { Modal } from '@/shared/ui/Modal';
 import { useToast } from '@/shared/ui/Toast';
 import { releaseKeys } from '@/shared/lib/queryKeys';
 import { canCreateRelease } from '@/shared/lib/roles';
+import { createReleaseSchema, releaseFiltersSchema } from '@/shared/lib/schemas';
 import type { Role } from '@/shared/types';
-
-const createReleaseSchema = z.object({
-  version: z.string().min(1, 'Version is required'),
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
-});
 
 type CreateReleaseFormData = z.infer<typeof createReleaseSchema>;
 
@@ -46,7 +40,6 @@ interface ReleaseListProps {
 }
 
 export function ReleaseList({ productId, userRole }: ReleaseListProps) {
-  const { user } = useAuth();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,20 +55,25 @@ export function ReleaseList({ productId, userRole }: ReleaseListProps) {
     resolver: zodResolver(createReleaseSchema),
   });
 
+  // Normalize URL params with Zod at the boundary
+  const filters = releaseFiltersSchema.parse({
+    status: status || undefined,
+    search: search || undefined,
+    sort,
+    page,
+  });
+
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: releaseKeys.list(productId, { status, search, sort, page: String(page) }),
-    queryFn: () => getReleases(productId, { status: status || undefined, search: search || undefined, sort: sort || undefined, page }),
+    queryFn: () => getReleases(productId, filters),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CreateReleaseFormData) => createRelease({
+      productId,
       version: data.version,
       title: data.title,
-      description: data.description ?? null,
-      product_id: productId,
-      created_by: user!.id,
-      planned_at: null,
-      published_at: null,
+      description: data.description ?? undefined,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ 

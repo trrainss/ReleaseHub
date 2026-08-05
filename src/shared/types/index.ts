@@ -62,28 +62,58 @@ export interface Product {
   created_at: string;
 }
 
-export interface Release {
-    id: string;
-    product_id: string;
-    version: string;
-    title: string;
-    description: string | null;
-    status: 'draft' | 'review' | 'approved' | 'rejected' | 'published';
-    planned_at: string | null;
-    published_at: string | null;
-    created_by: string;
-    created_at: string;
-    updated_at: string;
-    row_version: number;
-    products?: {
-        workspace_id: string;
-        name: string;
-        slug: string;
-    };
-    /** Subquery result: count of changes (list queries) or full change array (published releases) */
-    release_changes?: { count: number } | ReleaseChange[];
-    /** Subquery result: count of reviewers (available in list queries) */
-    release_reviewers?: { count: number };
+// Base release fields shared across all query shapes
+export interface ReleaseBase {
+  id: string;
+  product_id: string;
+  version: string;
+  title: string;
+  description: string | null;
+  status: ReleaseStatus;
+  planned_at: string | null;
+  published_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  row_version: number;
+}
+
+// Release list query shape (shows count of changes, no nested arrays)
+export interface ReleaseSummary extends ReleaseBase {
+  changesCount: number;
+  reviewersCount: number;
+}
+
+// Release detail query shape (includes product info)
+export interface ReleaseDetails extends ReleaseBase {
+  products?: {
+    workspace_id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+// Published release notes shape (includes changes array and product slug)
+export interface PublishedReleaseNotes extends ReleaseBase {
+  changes: ReleaseChange[];
+  product: {
+    name: string;
+    slug: string;
+  };
+}
+
+// For backward compatibility in current code that uses `release_changes` union
+// This will be gradually replaced by the explicit types above
+export interface Release extends ReleaseBase {
+  products?: {
+    workspace_id: string;
+    name: string;
+    slug: string;
+  };
+  /** Subquery result: count of changes (list queries) or full change array (published releases) */
+  release_changes?: { count: number } | ReleaseChange[];
+  /** Subquery result: count of reviewers (available in list queries) */
+  release_reviewers?: { count: number };
 }
 
 export interface ReleaseChange {

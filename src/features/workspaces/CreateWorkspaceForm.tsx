@@ -20,7 +20,7 @@ interface CreateWorkspaceFormProps {
 }
 
 export function CreateWorkspaceForm({ onSuccess }: CreateWorkspaceFormProps) {
-  const { user } = useAuth(); // ← получаем пользователя
+  const { user } = useAuth();
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -29,12 +29,7 @@ export function CreateWorkspaceForm({ onSuccess }: CreateWorkspaceFormProps) {
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      if (!user) {
-        throw new Error('You must be logged in to create a workspace');
-      }
-      return createWorkspace(data.name, user.id);
-    },
+    mutationFn: (data: FormData) => createWorkspace(data.name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
       addToast('Workspace created', 'success');

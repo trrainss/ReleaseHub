@@ -24,14 +24,14 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe('CreateReleaseForm', () => {
   it('renders form fields', () => {
-    renderWithProviders(<CreateReleaseForm productId="p1" createdBy="u1" />);
+    renderWithProviders(<CreateReleaseForm productId="p1" />);
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
     expect(screen.getByLabelText('Version')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create release/i })).toBeInTheDocument();
   });
 
   it('validates required fields', async () => {
-    renderWithProviders(<CreateReleaseForm productId="p1" createdBy="u1" />);
+    renderWithProviders(<CreateReleaseForm productId="p1" />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /create release/i }));
     await waitFor(() => {
@@ -43,7 +43,7 @@ describe('CreateReleaseForm', () => {
   it('submits with valid data', async () => {
     const onSuccess = vi.fn();
     renderWithProviders(
-      <CreateReleaseForm productId="p1" createdBy="u1" onSuccess={onSuccess} />,
+      <CreateReleaseForm productId="p1" onSuccess={onSuccess} />,
     );
     const user = userEvent.setup();
     await user.type(screen.getByLabelText('Title'), 'Test Release');

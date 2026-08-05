@@ -1,8 +1,8 @@
 import { supabase } from '@/shared/lib/supabase';
-import type { Workspace, WorkspaceMember, Product } from '@/shared/types';
+import type { Workspace, WorkspaceMember, Product, Role } from '@/shared/types';
 import { mapWorkspaceRowToWorkspace, mapMemberRowToMember, mapProductRowToProduct } from '@/shared/lib/mappers';
 
-export async function createWorkspace(name: string, _userId: string) {
+export async function createWorkspace(name: string) {
     const { data, error } = await supabase.rpc('create_workspace', {
         workspace_name: name,
     });
@@ -93,7 +93,7 @@ export async function createProduct(workspaceId: string, name: string, slug: str
   if (error) throw error;
 }
 
-export async function inviteMember(workspaceId: string, email: string, role: string) {
+export async function inviteMember(workspaceId: string, email: string, role: Role) {
     const { data, error } = await supabase.rpc('invite_member', {
         p_workspace_id: workspaceId,
         p_email: email,
@@ -129,7 +129,7 @@ export async function removeMember(workspaceId: string, userId: string) {
     if (error) throw error;
 }
 
-export async function updateMemberRole(workspaceId: string, userId: string, role: string) {
+export async function updateMemberRole(workspaceId: string, userId: string, role: Role) {
     const { error } = await supabase.rpc('change_member_role', {
         p_workspace_id: workspaceId,
         p_user_id: userId,
