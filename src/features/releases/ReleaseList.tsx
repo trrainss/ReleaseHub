@@ -64,7 +64,7 @@ export function ReleaseList({ productId, userRole }: ReleaseListProps) {
   });
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: releaseKeys.list(productId, { status, search, sort, page: String(page) }),
+    queryKey: releaseKeys.list(productId, filters),
     queryFn: () => getReleases(productId, filters),
   });
 
@@ -77,7 +77,13 @@ export function ReleaseList({ productId, userRole }: ReleaseListProps) {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ 
-        queryKey: releaseKeys.list(productId, { status, search, page: String(page) }) 
+        queryKey: releaseKeys.list(productId, {
+          status: filters.status,
+          search: filters.search,
+          sort: filters.sort,
+          page: filters.page,
+          perPage: filters.perPage,
+        }) 
       });
       setShowCreateModal(false);
       reset();

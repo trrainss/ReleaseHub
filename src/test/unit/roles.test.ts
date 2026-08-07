@@ -43,12 +43,12 @@ describe('roles', () => {
   });
 
   it('owner can delete any change, maintainer can delete any, contributor only own', () => {
-    expect(canDeleteChange('owner', false)).toBe(true);
-    expect(canDeleteChange('owner', true)).toBe(true);
-    expect(canDeleteChange('maintainer', false)).toBe(true);
-    expect(canDeleteChange('maintainer', true)).toBe(true);
-    expect(canDeleteChange('contributor', true)).toBe(true);
-    expect(canDeleteChange('contributor', false)).toBe(false);
+    expect(canDeleteChange('owner', false, 'draft')).toBe(true);
+    expect(canDeleteChange('owner', true, 'draft')).toBe(true);
+    expect(canDeleteChange('maintainer', false, 'draft')).toBe(true);
+    expect(canDeleteChange('maintainer', true, 'draft')).toBe(true);
+    expect(canDeleteChange('contributor', true, 'draft')).toBe(true);
+    expect(canDeleteChange('contributor', false, 'draft')).toBe(false);
   });
 
   it('only owner can manage workspace', () => {
