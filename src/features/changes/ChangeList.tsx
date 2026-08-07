@@ -27,7 +27,7 @@ interface ChangeListProps {
   releaseId: string;
   status: ReleaseStatus;
   /** Permission predicate evaluated per change. */
-  canDeleteChange: () => boolean;
+  canDeleteChange: (change: ReleaseChange) => boolean;
 }
 
 export function ChangeList({ changes, releaseId, status, canDeleteChange }: ChangeListProps) {
@@ -103,7 +103,7 @@ export function ChangeList({ changes, releaseId, status, canDeleteChange }: Chan
               key={change.id}
               change={change}
               isDraggable={isDraggable}
-              canDelete={canDeleteChange()}
+              canDelete={canDeleteChange(change)}
               onDelete={() => setDeleteTarget(change)}
             />
           ))}

@@ -1,8 +1,10 @@
+import type { ReleaseFilters } from '@/shared/lib/schemas';
+
 export const releaseKeys = {
   all: ['releases'] as const,
   lists: () => [...releaseKeys.all, 'list'] as const,
-  list: (workspaceId: string, filters?: Record<string, string>) =>
-    [...releaseKeys.lists(), workspaceId, filters] as const,
+  list: (productId: string, filters?: ReleaseFilters) =>
+    [...releaseKeys.lists(), productId, filters] as const,
   details: () => [...releaseKeys.all, 'detail'] as const,
   detail: (releaseId: string) => [...releaseKeys.details(), releaseId] as const,
   changes: (releaseId: string) => [...releaseKeys.all, 'changes', releaseId] as const,
@@ -23,6 +25,11 @@ export const workspaceKeys = {
   invites: (id: string) => [...workspaceKeys.all, 'invites', id] as const,
   products: (id: string) => [...workspaceKeys.all, 'products', id] as const,
   activity: (id: string) => [...workspaceKeys.all, 'activity', id] as const,
+};
+
+export const inviteKeys = {
+  all: ['invites'] as const,
+  byToken: (token: string) => [...inviteKeys.all, 'byToken', token] as const,
 };
 
 export const profileKeys = {

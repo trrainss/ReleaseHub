@@ -1,12 +1,13 @@
 import { supabase } from '@/shared/lib/supabase';
 import type { Workspace, WorkspaceMember, Product, Role } from '@/shared/types';
 import { mapWorkspaceRowToWorkspace, mapMemberRowToMember, mapProductRowToProduct } from '@/shared/lib/mappers';
+import { mapSupabaseError } from '@/shared/lib/errors';
 
 export async function createWorkspace(name: string) {
     const { data, error } = await supabase.rpc('create_workspace', {
         workspace_name: name,
     });
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
     return data;
 }
 
@@ -15,7 +16,7 @@ export async function getWorkspaces(): Promise<Workspace[]> {
     .from('workspaces')
     .select('*')
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
   return (data ?? []).map(mapWorkspaceRowToWorkspace);
 }
 
@@ -25,7 +26,7 @@ export async function getWorkspace(id: string): Promise<Workspace | null> {
     .select('*')
     .eq('id', id)
     .single();
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
   return data ? mapWorkspaceRowToWorkspace(data) : null;
 }
 
@@ -34,7 +35,7 @@ export async function updateWorkspace(id: string, updates: Partial<Pick<Workspac
     .from('workspaces')
     .update(updates)
     .eq('id', id);
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
 }
 
 export async function deleteWorkspace(id: string) {
@@ -42,7 +43,7 @@ export async function deleteWorkspace(id: string) {
     .from('workspaces')
     .delete()
     .eq('id', id);
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
 }
 
 export async function getWorkspaceMembers(workspaceId: string): Promise<(WorkspaceMember & { profile: { display_name: string; avatar_url: string | null } })[]> {
@@ -50,7 +51,7 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<(Workspa
     .from('workspace_members')
     .select('*, profile:profiles!user_id(display_name, avatar_url)')
     .eq('workspace_id', workspaceId);
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
   return (data ?? []).map(mapMemberRowToMember);
 }
 
@@ -61,7 +62,7 @@ export async function getWorkspaceMember(workspaceId: string, userId: string): P
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .single();
-  if (error && error.code !== 'PGRST116') throw error;
+  if (error && error.code !== 'PGRST116') throw mapSupabaseError(error);
   return data;
 }
 
@@ -72,7 +73,7 @@ export async function getDefaultProduct(workspaceId: string): Promise<Product | 
     .eq('workspace_id', workspaceId)
     .limit(1)
     .single();
-  if (error && error.code !== 'PGRST116') throw error;
+  if (error && error.code !== 'PGRST116') throw mapSupabaseError(error);
   return data;
 }
 
@@ -82,7 +83,7 @@ export async function getProducts(workspaceId: string): Promise<Product[]> {
     .select('*')
     .eq('workspace_id', workspaceId)
     .order('created_at');
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
   return (data ?? []).map(mapProductRowToProduct);
 }
 
@@ -90,7 +91,7 @@ export async function createProduct(workspaceId: string, name: string, slug: str
   const { error } = await supabase
     .from('products')
     .insert({ workspace_id: workspaceId, name, slug, description });
-  if (error) throw error;
+  if (error) throw mapSupabaseError(error);
 }
 
 export async function inviteMember(workspaceId: string, email: string, role: Role) {
@@ -99,7 +100,7 @@ export async function inviteMember(workspaceId: string, email: string, role: Rol
         p_email: email,
         p_role: role,
     });
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
     return data;
 }
 
@@ -109,7 +110,7 @@ export async function getInvites(workspaceId: string) {
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
     return data ?? [];
 }
 
@@ -117,7 +118,7 @@ export async function acceptInvite(tokenHash: string) {
     const { data, error } = await supabase.rpc('accept_invite', { 
         p_token_hash: tokenHash 
     });
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
     return data;
 }
 
@@ -126,7 +127,7 @@ export async function removeMember(workspaceId: string, userId: string) {
         p_workspace_id: workspaceId,
         p_user_id: userId,
     });
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
 }
 
 export async function updateMemberRole(workspaceId: string, userId: string, role: Role) {
@@ -135,7 +136,7 @@ export async function updateMemberRole(workspaceId: string, userId: string, role
         p_user_id: userId,
         p_new_role: role,
     });
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
 }
 
 export async function getMyInvites(email: string) {
@@ -144,7 +145,7 @@ export async function getMyInvites(email: string) {
         .select('*')
         .eq('email', email)
         .eq('status', 'pending');
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
     return data ?? [];
 }
 
@@ -153,7 +154,7 @@ export async function declineInvite(inviteId: string) {
         .from('workspace_invites')
         .update({ status: 'expired' })
         .eq('id', inviteId);
-    if (error) throw error;
+    if (error) throw mapSupabaseError(error);
 }
 
 export async function getInviteByToken(token: string) {
@@ -163,6 +164,11 @@ export async function getInviteByToken(token: string) {
         .eq('token_hash', token)
         .eq('status', 'pending')
         .single();
-    if (error) return null;
+    if (error?.code === 'PGRST116') {
+        return null;
+    }
+    if (error) {
+        throw mapSupabaseError(error);
+    }
     return data;
 }

@@ -13,7 +13,7 @@ import type {
   ReleaseDetails,
   PublishedReleaseNotes,
 } from '@/shared/types';
-import { releaseRowSchema, changeRowSchema, activityEventRowSchema } from '@/shared/lib/schemas';
+import { releaseRowSchema, changeRowSchema, activityEventRowSchema, approvalDecisionSchema, workspaceRowSchema, productRowSchema, workspaceMemberRowSchema, profileRowSchema, commentRowSchema } from '@/shared/lib/schemas';
 
 /**
  * Mapper functions — convert raw Supabase row objects to typed domain models.
@@ -114,13 +114,16 @@ export function mapReleaseToPublishedNotes(release: Release): PublishedReleaseNo
   if (!release.products?.slug) {
     throw new Error('Published release notes require product slug');
   }
+  if (release.status !== 'published') {
+    throw new Error(`Expected status 'published', got '${release.status}'`);
+  }
   return {
     id: release.id,
     product_id: release.product_id,
     version: release.version,
     title: release.title,
     description: release.description,
-    status: release.status,
+    status: 'published' as const,
     planned_at: release.planned_at,
     published_at: release.published_at,
     created_by: release.created_by,
@@ -157,22 +160,8 @@ export function mapReviewerRowToReviewer(
     id: row.id,
     release_id: row.release_id,
     user_id: row.user_id,
-    decision: row.decision as 'approve' | 'reject' | null,
+    decision: approvalDecisionSchema.parse(row.decision),
     decided_at: row.decided_at,
-    profile: row.profile ?? { display_name: 'Unknown', avatar_url: null },
-  };
-}
-
-export function mapCommentRowToComment(
-  row: CommentQueryRow,
-): Comment & { profile: { display_name: string; avatar_url: string | null } } {
-  return {
-    id: row.id,
-    release_id: row.release_id,
-    user_id: row.user_id,
-    content: row.content,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
     profile: row.profile ?? { display_name: 'Unknown', avatar_url: null },
   };
 }
@@ -191,44 +180,63 @@ export function mapActivityRowToActivity(row: UnknownRecord): ActivityEvent {
 }
 
 export function mapWorkspaceRowToWorkspace(row: DbWorkspace): Workspace {
+  const parsed = workspaceRowSchema.parse(row);
   return {
-    id: row.id,
-    name: row.name,
-    created_by: row.created_by,
-    created_at: row.created_at,
+    id: parsed.id,
+    name: parsed.name,
+    created_by: parsed.created_by,
+    created_at: parsed.created_at,
   };
 }
 
 export function mapMemberRowToMember(
   row: WorkspaceMemberQueryRow,
 ): WorkspaceMember & { profile: { display_name: string; avatar_url: string | null } } {
+  const parsed = workspaceMemberRowSchema.parse(row);
   return {
-    id: row.id,
-    workspace_id: row.workspace_id,
-    user_id: row.user_id,
-    role: row.role,
-    created_at: row.created_at,
+    id: parsed.id,
+    workspace_id: parsed.workspace_id,
+    user_id: parsed.user_id,
+    role: parsed.role,
+    created_at: parsed.created_at,
     profile: row.profile ?? { display_name: 'Unknown', avatar_url: null },
   };
 }
 
 export function mapProductRowToProduct(row: DbProduct): Product {
+  const parsed = productRowSchema.parse(row);
   return {
-    id: row.id,
-    workspace_id: row.workspace_id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    created_at: row.created_at,
+    id: parsed.id,
+    workspace_id: parsed.workspace_id,
+    name: parsed.name,
+    slug: parsed.slug,
+    description: parsed.description,
+    created_at: parsed.created_at,
   };
 }
 
 export function mapProfileRowToProfile(row: DbProfile): Profile {
+  const parsed = profileRowSchema.parse(row);
   return {
-    id: row.id,
-    display_name: row.display_name,
-    avatar_url: row.avatar_url,
-    created_at: row.created_at,
+    id: parsed.id,
+    display_name: parsed.display_name,
+    avatar_url: parsed.avatar_url,
+    created_at: parsed.created_at,
+  };
+}
+
+export function mapCommentRowToComment(
+  row: CommentQueryRow,
+): Comment & { profile: { display_name: string; avatar_url: string | null } } {
+  const parsed = commentRowSchema.parse(row);
+  return {
+    id: parsed.id,
+    release_id: parsed.release_id,
+    user_id: parsed.user_id,
+    content: parsed.content,
+    created_at: parsed.created_at,
+    updated_at: parsed.updated_at,
+    profile: row.profile ?? { display_name: 'Unknown', avatar_url: null },
   };
 }
 

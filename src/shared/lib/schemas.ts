@@ -12,6 +12,8 @@ export const eventTypeSchema = z.enum([
   'workspace_created', 'release_created', 'release_submitted',
   'release_approved', 'release_rejected', 'release_published',
   'member_added', 'member_removed', 'role_changed',
+  'release_restored', 'release_unpublished', 'product_created',
+  'reviewer_replaced',
 ]) as z.ZodType<EventType>;
 
 // ============================================================
@@ -136,6 +138,65 @@ export const workspaceNameSchema = z.object({
 });
 
 export type WorkspaceNameInput = z.infer<typeof workspaceNameSchema>;
+
+export const approvalDecisionSchema = z.enum(['approve', 'reject']).nullable();
+
+export const inviteDataSchema = z.object({
+  id: z.string().uuid(),
+  workspace_id: z.string().uuid(),
+  email: z.string().email(),
+  role: roleSchema,
+  status: z.enum(['pending', 'accepted', 'expired']),
+  expires_at: z.string(),
+  invited_by: z.string().uuid(),
+  created_at: z.string(),
+  workspaces: z
+    .object({ name: z.string() })
+    .nullable()
+    .optional(),
+});
+
+export type InviteData = z.infer<typeof inviteDataSchema>;
+
+export const workspaceRowSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  created_by: z.string().uuid(),
+  created_at: z.string(),
+});
+
+export const productRowSchema = z.object({
+  id: z.string().uuid(),
+  workspace_id: z.string().uuid(),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().nullable(),
+  created_at: z.string(),
+});
+
+export const workspaceMemberRowSchema = z.object({
+  id: z.string().uuid(),
+  workspace_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  role: roleSchema,
+  created_at: z.string(),
+});
+
+export const profileRowSchema = z.object({
+  id: z.string().uuid(),
+  display_name: z.string(),
+  avatar_url: z.string().nullable(),
+  created_at: z.string(),
+});
+
+export const commentRowSchema = z.object({
+  id: z.string().uuid(),
+  release_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  content: z.string().min(1),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
 
 // ============================================================
 // Search query sanitization

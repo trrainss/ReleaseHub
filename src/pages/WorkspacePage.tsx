@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { useParams, Routes, Route, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { getWorkspace, getWorkspaceMember, getProducts, createProduct, updateWorkspace } from '@/shared/api/workspaces';
@@ -16,7 +16,6 @@ import { InviteForm } from '@/features/members/InviteForm';
 import { ActivityLog } from '@/features/comments/ActivityLog';
 import { workspaceKeys } from '@/shared/lib/queryKeys';
 import { canManageMembers, canManageWorkspace } from '@/shared/lib/roles';
-import type { Role } from '@/shared/types';
 
 export function WorkspacePage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -31,32 +30,32 @@ export function WorkspacePage() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const { data: workspace, isLoading: wsLoading, isError: wsError, error: wsErrorData, refetch: wsRefetch } = useQuery({
-    queryKey: workspaceKeys.detail(workspaceId!),
-    queryFn: () => getWorkspace(workspaceId!),
+    queryKey: workspaceId ? workspaceKeys.detail(workspaceId) : workspaceKeys.detail('skip'),
+    queryFn: workspaceId ? () => getWorkspace(workspaceId) : skipToken,
     enabled: !!workspaceId,
   });
 
   const { data: membership } = useQuery({
-    queryKey: [...workspaceKeys.members(workspaceId!), user?.id],
-    queryFn: () => getWorkspaceMember(workspaceId!, user!.id),
+    queryKey: workspaceId && user ? workspaceKeys.member(workspaceId, user.id) : ['skip'],
+    queryFn: workspaceId && user ? () => getWorkspaceMember(workspaceId, user.id) : skipToken,
     enabled: !!workspaceId && !!user,
   });
 
   const { data: products } = useQuery({
-    queryKey: workspaceKeys.products(workspaceId!),
-    queryFn: () => getProducts(workspaceId!),
+    queryKey: workspaceId ? workspaceKeys.products(workspaceId) : workspaceKeys.products('skip'),
+    queryFn: workspaceId ? () => getProducts(workspaceId) : skipToken,
     enabled: !!workspaceId,
   });
 
   const { data: activity } = useQuery({
-    queryKey: workspaceKeys.activity(workspaceId!),
-    queryFn: () => getWorkspaceActivity(workspaceId!),
+    queryKey: workspaceId ? workspaceKeys.activity(workspaceId) : workspaceKeys.activity('skip'),
+    queryFn: workspaceId ? () => getWorkspaceActivity(workspaceId) : skipToken,
     enabled: !!workspaceId,
   });
 
-  const userRole = (membership?.role as Role) ?? null;
-  const canManage = canManageMembers(userRole as Role);
-  const canManageWs = canManageWorkspace(userRole as Role);
+  const userRole = membership?.role ?? null;
+  const canManage = userRole !== null && canManageMembers(userRole);
+  const canManageWs = userRole !== null && canManageWorkspace(userRole);
 
   // --- useMutation: Update workspace ---
   const updateWorkspaceMutation = useMutation({
@@ -162,7 +161,11 @@ export function WorkspacePage() {
         } />
         <Route path="members" element={
           <div>
-            <MemberList workspaceId={workspaceId!} userRole={userRole as Role} />
+            {userRole !== null ? (
+              <MemberList workspaceId={workspaceId!} userRole={userRole} />
+            ) : (
+              <LoadingSpinner />
+            )}
           </div>
         } />
         <Route path="activity" element={

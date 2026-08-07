@@ -15,9 +15,13 @@ export type EventType =
   | 'release_approved'
   | 'release_rejected'
   | 'release_published'
+  | 'release_restored'
+  | 'release_unpublished'
   | 'member_added'
   | 'member_removed'
-  | 'role_changed';
+  | 'role_changed'
+  | 'product_created'
+  | 'reviewer_replaced';
 
 export interface Profile {
   id: string;
@@ -94,7 +98,9 @@ export interface ReleaseDetails extends ReleaseBase {
 }
 
 // Published release notes shape (includes changes array and product slug)
-export interface PublishedReleaseNotes extends ReleaseBase {
+// Status is always 'published' — enforced by Zod mapper
+export interface PublishedReleaseNotes extends Omit<ReleaseBase, 'status'> {
+  status: 'published';
   changes: ReleaseChange[];
   product: {
     name: string;

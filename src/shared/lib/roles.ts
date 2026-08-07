@@ -1,4 +1,4 @@
-import type { Role } from '@/shared/types';
+import type { Role, ReleaseStatus } from '@/shared/types';
 
 const ROLE_HIERARCHY: Record<Role, number> = {
   owner: 3,
@@ -46,7 +46,8 @@ export function canEditChange(_role: Role): boolean {
   return true;
 }
 
-export function canDeleteChange(role: Role, isOwnChange: boolean): boolean {
+export function canDeleteChange(role: Role, isOwnChange: boolean, status: ReleaseStatus): boolean {
+  if (status === 'published') return false;
   return role === 'owner' || role === 'maintainer' || isOwnChange;
 }
 

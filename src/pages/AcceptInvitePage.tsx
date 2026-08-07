@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/shared/ui/Button';
@@ -6,19 +6,9 @@ import { LoadingSpinner } from '@/shared/ui/LoadingSpinner';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { useToast } from '@/shared/ui/Toast';
 import { getInviteByToken, acceptInvite } from '@/shared/api/workspaces';
-
-interface InviteData {
-  id: string;
-  workspace_id: string;
-  email: string;
-  role: string;
-  token_hash: string;
-  status: string;
-  expires_at: string;
-  invited_by: string;
-  created_at: string;
-  workspaces?: { name: string } | null;
-}
+import { inviteKeys } from '@/shared/lib/queryKeys';
+import { inviteDataSchema } from '@/shared/lib/schemas';
+import { skipToken } from '@tanstack/react-query';
 
 export function AcceptInvitePage() {
     const [searchParams] = useSearchParams();
@@ -26,36 +16,20 @@ export function AcceptInvitePage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { addToast } = useToast();
-    const [inviteData, setInviteData] = useState<InviteData | null>(null);
-    const [error, setError] = useState(() => (!token ? 'Invalid invite link' : ''));
 
-    useEffect(() => {
-        if (!token) {
-            return;
-        }
-
-        const checkInvite = async () => {
-            const data = await getInviteByToken(token);
-
-            if (!data) {
-                setError('Invite is invalid or expired');
-                return;
-            }
-
-            setInviteData(data as unknown as InviteData);
-        };
-
-        checkInvite();
-    }, [token]);
+    const inviteQuery = useQuery({
+        queryKey: token ? inviteKeys.byToken(token) : [],
+        queryFn: token ? () => getInviteByToken(token) : skipToken,
+        enabled: !!token,
+    });
 
     const acceptMutation = useMutation({
-        mutationFn: () => acceptInvite(token!),
+        mutationFn: (t: string) => acceptInvite(t),
         onSuccess: () => {
             addToast('Successfully joined the workspace!', 'success');
             navigate('/workspaces');
         },
         onError: (err: Error) => {
-            setError(err.message || 'Failed to accept invite');
             addToast(err.message || 'Failed to accept invite', 'error');
         },
     });
@@ -65,16 +39,21 @@ export function AcceptInvitePage() {
             navigate('/auth/signin?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
             return;
         }
-        acceptMutation.mutate();
+        if (token) acceptMutation.mutate(token);
     };
 
-    if (error) {
+    const inviteData = inviteQuery.data ?? null;
+    const hasError = inviteQuery.isError || !token;
+
+    if (hasError) {
         return (
             <div className="auth-page">
                 <div className="auth-form" style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '3rem', marginBottom: 'var(--space-lg)', opacity: 0.5 }}>!</div>
                     <h1 className="auth-form__title">Invalid Invite</h1>
-                    <p className="auth-form__subtitle">{error}</p>
+                    <p className="auth-form__subtitle">
+                        {inviteQuery.error instanceof Error ? inviteQuery.error.message : (token ? 'Invite is invalid or expired' : 'Invalid invite link')}
+                    </p>
                     <Button onClick={() => navigate('/workspaces')} className="auth-form__submit">
                         Go to Workspaces
                     </Button>
@@ -91,16 +70,18 @@ export function AcceptInvitePage() {
         );
     }
 
+    const validatedInvite = inviteDataSchema.parse(inviteData);
+
     return (
         <div className="auth-page">
             <div className="auth-form">
                 <div style={{ textAlign: 'center', marginBottom: 'var(--space-2xl)' }}>
                     <h1 className="auth-form__title">Join Workspace</h1>
                     <p className="auth-form__subtitle">
-                        You've been invited to join <strong>{inviteData.workspaces?.name || 'a workspace'}</strong>
+                        You've been invited to join <strong>{validatedInvite.workspaces?.name || 'a workspace'}</strong>
                     </p>
                     <p className="auth-form__subtitle" style={{ marginTop: 'var(--space-xs)', color: 'var(--color-text-tertiary)', fontSize: '0.8125rem' }}>
-                        Role: <strong style={{ color: 'var(--color-primary)' }}>{inviteData.role}</strong>
+                        Role: <strong style={{ color: 'var(--color-primary)' }}>{validatedInvite.role}</strong>
                     </p>
                 </div>
 

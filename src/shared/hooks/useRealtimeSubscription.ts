@@ -50,6 +50,9 @@ export function useRealtimeRelease(releaseId: string | undefined): RealtimeResul
   useEffect(() => {
     if (!releaseId) return;
 
+    // Clear dedup set when switching releases to avoid stale keys
+    processedKeys.current.clear();
+
     const isDuplicate = (table: string, payload: RealtimePostgresChangesPayload<Record<string, unknown>>): boolean => {
       const commitTs = (payload.commit_timestamp as string) ?? '';
       const record = payload.new && isRecord(payload.new) ? payload.new : (payload.old as Record<string, unknown> | undefined);
